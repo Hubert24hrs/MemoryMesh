@@ -1,30 +1,207 @@
 {
   "expo": {
     "name": "MemoryMesh",
-    "slug": "MemoryMesh",
-    "version": "1.0.0",
+    "slug": "memorymesh",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "userInterfaceStyle": "dark",
+    "scheme": "memorymesh",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0A0E27"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.memorymesh.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "MemoryMesh needs microphone access to record voice memories",
+        "NSLocationWhenInUseUsageDescription": "MemoryMesh uses your location to trigger location-based memory reminders",
+        "NSLocationAlwaysUsageDescription": "MemoryMesh uses background location for proactive memory surfacing",
+        "NSFaceIDUsageDescription": "Secure your memories with Face ID",
+        "NSCameraUsageDescription": "Capture images to attach to your memories",
+        "NSPhotoLibraryUsageDescription": "Access photos to attach to memories",
+        "NSPhotoLibraryAddUsageDescription": "Save memory images to your photo library",
+        "NSSpeechRecognitionUsageDescription": "Enable voice commands for hands-free operation",
+        "NSContactsUsageDescription": "Tag people in your memories",
+        "NSCalendarsUsageDescription": "Link memories to calendar events",
+        "NSRemindersUsageDescription": "Create reminders from memories",
+        "UIBackgroundModes": [
+          "audio",
+          "location",
+          "fetch",
+          "remote-notification",
+          "processing"
+        ],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSExceptionDomains": {
+            "supabase.co": {
+              "NSIncludesSubdomains": true,
+              "NSRequiresCertificateTransparency": true,
+              "NSExceptionMinimumTLSVersion": "TLSv1.3"
+            },
+            "anthropic.com": {
+              "NSIncludesSubdomains": true,
+              "NSRequiresCertificateTransparency": true
+            },
+            "moonshot.cn": {
+              "NSIncludesSubdomains": true,
+              "NSRequiresCertificateTransparency": true
+            }
+          }
+        }
+      },
+      "associatedDomains": [
+        "applinks:memorymesh.app"
+      ],
+      "usesAppleSignIn": true
     },
     "android": {
+      "package": "com.memorymesh.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0A0E27"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "FOREGROUND_SERVICE_MICROPHONE",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "READ_CONTACTS",
+        "READ_CALENDAR",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
+      "blockedPermissions": [],
+      "useNextNotificationsApi": true
     },
     "web": {
+      "bundler": "metro",
+      "output": "static",
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-av",
+      "expo-location",
+      "expo-local-authentication",
+      "expo-secure-store",
+      "expo-camera",
+      "expo-image-picker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#00F5FF",
+          "sounds": [
+            "./assets/sounds/notification.wav"
+          ],
+          "mode": "production"
+        }
+      ],
+      [
+        "@react-native-google-mobile-ads/expo-plugin",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "userTrackingPermission": "This allows us to show personalized ads"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "14.0",
+            "useFrameworks": "static"
+          },
+          "android": {
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
+            "minSdkVersion": 24,
+            "buildToolsVersion": "34.0.0",
+            "kotlinVersion": "1.9.0"
+          }
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/Inter-Regular.ttf",
+            "./assets/fonts/Inter-Medium.ttf",
+            "./assets/fonts/Inter-SemiBold.ttf",
+            "./assets/fonts/Inter-Bold.ttf",
+            "./assets/fonts/SpaceGrotesk-Bold.ttf"
+          ]
+        }
+      ],
+      "expo-router",
+      "@react-native-firebase/app",
+      "@react-native-firebase/crashlytics",
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "$(PRODUCT_NAME) needs camera access for capturing memory images",
+          "enableCodeScanner": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "tsconfigPaths": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "your-project-id-here"
+      },
+      "apiKeys": {
+        "supabase": {
+          "url": "https://your-project.supabase.co",
+          "anonKey": "your-anon-key"
+        },
+        "anthropic": {
+          "apiKey": "your-claude-api-key"
+        },
+        "kimi": {
+          "apiKey": "your-kimi-api-key",
+          "baseURL": "https://api.moonshot.cn/v1"
+        },
+        "openai": {
+          "apiKey": "your-openai-key"
+        },
+        "pinecone": {
+          "apiKey": "your-pinecone-key",
+          "environment": "us-east-1-aws",
+          "indexName": "memorymesh-memories"
+        }
+      }
+    },
+    "owner": "your-expo-username",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/your-project-id"
     }
   }
 }

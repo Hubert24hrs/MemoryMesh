@@ -1,0 +1,105 @@
+{
+  "cli": {
+    "version": ">= 7.8.0",
+    "appVersionSource": "remote",
+    "requireCommit": true
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "APP_ENV": "development",
+        "ENABLE_DEBUGGING": "true",
+        "ENABLE_ANALYTICS": "false",
+        "USE_PRODUCTION_AI": "false"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Debug"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "APP_ENV": "staging",
+        "ENABLE_DEBUGGING": "true",
+        "ENABLE_ANALYTICS": "true",
+        "USE_PRODUCTION_AI": "true"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release",
+        "enterpriseProvisioning": "adhoc"
+      },
+      "channel": "preview"
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "APP_ENV": "production",
+        "ENABLE_DEBUGGING": "false",
+        "ENABLE_ANALYTICS": "true",
+        "USE_PRODUCTION_AI": "true",
+        "SENTRY_ENABLED": "true"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease",
+        "image": "latest"
+      },
+      "ios": {
+        "buildConfiguration": "Release",
+        "enterpriseProvisioning": "universal",
+        "image": "latest"
+      },
+      "channel": "production"
+    },
+    "production-simulator": {
+      "extends": "production",
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
+        "track": "production",
+        "releaseStatus": "completed",
+        "rollout": 1.0
+      },
+      "ios": {
+        "ascAppId": "your-app-id",
+        "ascTeamId": "your-team-id",
+        "ascApiKeyPath": "./secrets/AuthKey.p8",
+        "ascApiKeyIssuerId": "your-issuer-id",
+        "ascApiKeyId": "your-key-id",
+        "appleTeamId": "your-apple-team-id"
+      }
+    },
+    "staging": {
+      "android": {
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
+        "track": "internal"
+      },
+      "ios": {
+        "ascAppId": "your-app-id",
+        "ascApiKeyPath": "./secrets/AuthKey.p8",
+        "ascApiKeyIssuerId": "your-issuer-id",
+        "ascApiKeyId": "your-key-id",
+        "appleTeamId": "your-apple-team-id"
+      }
+    }
+  }
+}
