@@ -37,7 +37,7 @@ import { LoadingScreen } from './src/components/LoadingScreen';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 // Theme
-import theme from './src/theme/enhancedTheme';
+// import theme from './src/theme/enhancedTheme';
 
 // Ignore specific warnings
 LogBox.ignoreLogs([
@@ -69,7 +69,9 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
-  }),
+    shouldShowBanner: true,
+    shouldShowList: true,
+  } as any),
 });
 
 // React Query client configuration
@@ -199,7 +201,7 @@ function AppContent() {
       });
       
       // Navigate to relevant screen based on notification type
-      const { type, memoryId } = response.notification.request.content.data || {};
+      // const { type, memoryId } = response.notification.request.content.data || {};
       // Navigation will be handled in RootNavigator
     };
 
@@ -214,7 +216,7 @@ function AppContent() {
   /**
    * Handle deep linking
    */
-  const linking = {
+  const linking: any = {
     prefixes: ['memorymesh://', 'https://memorymesh.app'],
     config: {
       screens: {

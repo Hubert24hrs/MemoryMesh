@@ -8,106 +8,11 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { aiOrchestrator, AIProvider } from '../services/ai/AIProvider';
+import { Memory, MemoryInput, SearchFilters, AIProvider } from '../types/memory';
+import { aiOrchestrator } from '../services/ai/AIProvider';
 import { memoryService } from '../services/memory';
 import { offlineSync } from '../services/offlineSync';
 import { analyticsService } from '../services/analytics';
-
-// ============================================================================
-// TYPES
-// ============================================================================
-
-export interface Memory {
-  id: string;
-  userId: string;
-  contentEncrypted: string;
-  transcription?: string;
-  transcriptionLanguage?: string;
-  transcriptionConfidence?: number;
-  
-  // AI-generated metadata
-  aiSummary?: string;
-  aiTitle?: string;
-  aiProvider: AIProvider;
-  aiConfidence: number;
-  
-  // Context extraction
-  contextTags: string[];
-  people: string[];
-  places: string[];
-  dates: string[];
-  tasks: string[];
-  emotions: string[];
-  
-  // Advanced AI analysis
-  category?: string;
-  sentiment: 'positive' | 'negative' | 'neutral' | 'mixed';
-  priority: number;
-  emotionIntensity?: number;
-  
-  // Code-specific
-  codeLanguage?: string;
-  codePurpose?: string;
-  
-  // Media
-  mediaType: 'voice' | 'text' | 'image' | 'code';
-  audioUrl?: string;
-  audioDuration?: number;
-  imageUrls?: string[];
-  
-  // Location
-  location?: {
-    latitude: number;
-    longitude: number;
-    accuracy?: number;
-    name?: string;
-  };
-  
-  // Reminders
-  reminderAt?: Date;
-  reminderSent: boolean;
-  
-  // Organization
-  isArchived: boolean;
-  isFavorite: boolean;
-  isPinned: boolean;
-  colorTag?: string;
-  customTags: string[];
-  
-  // Metadata
-  viewCount: number;
-  editCount: number;
-  createdAt: Date;
-  updatedAt: Date;
-  processedAt?: Date;
-}
-
-export interface MemoryInput {
-  content: string;
-  transcription?: string;
-  mediaType: Memory['mediaType'];
-  audioUrl?: string;
-  imageUrls?: string[];
-  location?: Memory['location'];
-  reminderAt?: Date;
-  customTags?: string[];
-  aiProvider?: AIProvider;
-  useEnsemble?: boolean;
-}
-
-export interface SearchFilters {
-  query?: string;
-  category?: string;
-  sentiment?: Memory['sentiment'];
-  priority?: number;
-  startDate?: Date;
-  endDate?: Date;
-  tags?: string[];
-  people?: string[];
-  places?: string[];
-  isArchived?: boolean;
-  isFavorite?: boolean;
-}
 
 // ============================================================================
 // STORE STATE
@@ -244,7 +149,7 @@ const initialState: MemoryState = {
 
 export const useMemoryStore = create<MemoryState & MemoryActions>()(
   persist(
-    immer((set, get) => ({
+    immer((set: any, get: any) => ({
       ...initialState,
 
       // ======================================================================
@@ -267,7 +172,7 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
             filters: activeFilters,
           });
 
-          set((state) => {
+          set((state: any) => {
             state.memories = reset 
               ? fetchedMemories 
               : [...state.memories, ...fetchedMemories];
@@ -309,10 +214,11 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
           let transcription = input.transcription || input.content;
           if (input.mediaType === 'voice' && input.audioUrl) {
             set({ processingProgress: 10 });
-            transcription = await aiOrchestrator.transcribeAudio(
+            const result = await aiOrchestrator.transcribeAudio(
               input.audioUrl,
               input.aiProvider
             );
+            transcription = result.text;
           }
 
           // Step 2: Extract context with AI (40%)
@@ -348,7 +254,7 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
           });
 
           // Step 5: Update local state (100%)
-          set((state) => {
+          set((state: any) => {
             state.memories.unshift(memory);
             state.monthlyCount += 1;
             state.processingProgress = 100;
@@ -373,7 +279,7 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
           
           // Queue for offline sync if network error
           if (error.message.includes('network') || error.message.includes('offline')) {
-            set((state) => {
+            set((state: any) => {
               state.pendingOperations.push({
                 id: crypto.randomUUID(),
                 type: 'create',
@@ -393,8 +299,8 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
         try {
           await memoryService.updateMemory(id, updates);
 
-          set((state) => {
-            const index = state.memories.findIndex(m => m.id === id);
+          set((state: any) => {
+            const index = state.memories.findIndex((m: any) => m.id === id);
             if (index !== -1) {
               state.memories[index] = { ...state.memories[index], ...updates };
             }
@@ -406,7 +312,7 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
           set({ error: error.message, isLoading: false });
           
           // Queue for offline sync
-          set((state) => {
+          set((state: any) => {
             state.pendingOperations.push({
               id: crypto.randomUUID(),
               type: 'update',
@@ -423,8 +329,8 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
         try {
           await memoryService.deleteMemory(id);
 
-          set((state) => {
-            state.memories = state.memories.filter(m => m.id !== id);
+          set((state: any) => {
+            state.memories = state.memories.filter((m: any) => m.id !== id);
             if (state.selectedMemory?.id === id) {
               state.selectedMemory = null;
             }
@@ -436,7 +342,7 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
           set({ error: error.message, isLoading: false });
           
           // Queue for offline sync
-          set((state) => {
+          set((state: any) => {
             state.pendingOperations.push({
               id: crypto.randomUUID(),
               type: 'delete',
@@ -457,8 +363,8 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
         try {
           await Promise.all(ids.map(id => memoryService.deleteMemory(id)));
 
-          set((state) => {
-            state.memories = state.memories.filter(m => !ids.includes(m.id));
+          set((state: any) => {
+            state.memories = state.memories.filter((m: any) => !ids.includes(m.id));
             state.isLoading = false;
           });
 
@@ -476,8 +382,8 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
             ids.map(id => memoryService.updateMemory(id, { isArchived: true }))
           );
 
-          set((state) => {
-            state.memories = state.memories.map(m =>
+          set((state: any) => {
+            state.memories = state.memories.map((m: any) =>
               ids.includes(m.id) ? { ...m, isArchived: true } : m
             );
             state.isLoading = false;
@@ -563,7 +469,7 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
       },
 
       translateMemory: async (id: string, targetLanguage: string) => {
-        const memory = get().memories.find(m => m.id === id);
+        const memory = get().memories.find((m: any) => m.id === id);
         if (!memory) throw new Error('Memory not found');
 
         const translated = await aiOrchestrator.translateMemory(
@@ -583,28 +489,28 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
       // ======================================================================
 
       toggleArchive: async (id: string) => {
-        const memory = get().memories.find(m => m.id === id);
+        const memory = get().memories.find((m: any) => m.id === id);
         if (memory) {
           await get().updateMemory(id, { isArchived: !memory.isArchived });
         }
       },
 
       toggleFavorite: async (id: string) => {
-        const memory = get().memories.find(m => m.id === id);
+        const memory = get().memories.find((m: any) => m.id === id);
         if (memory) {
           await get().updateMemory(id, { isFavorite: !memory.isFavorite });
         }
       },
 
       togglePin: async (id: string) => {
-        const memory = get().memories.find(m => m.id === id);
+        const memory = get().memories.find((m: any) => m.id === id);
         if (memory) {
           await get().updateMemory(id, { isPinned: !memory.isPinned });
         }
       },
 
       addCustomTag: async (id: string, tag: string) => {
-        const memory = get().memories.find(m => m.id === id);
+        const memory = get().memories.find((m: any) => m.id === id);
         if (memory) {
           const customTags = [...new Set([...memory.customTags, tag])];
           await get().updateMemory(id, { customTags });
@@ -612,9 +518,9 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
       },
 
       removeCustomTag: async (id: string, tag: string) => {
-        const memory = get().memories.find(m => m.id === id);
+        const memory = get().memories.find((m: any) => m.id === id);
         if (memory) {
-          const customTags = memory.customTags.filter(t => t !== tag);
+          const customTags = memory.customTags.filter((t: any) => t !== tag);
           await get().updateMemory(id, { customTags });
         }
       },
@@ -665,7 +571,7 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
       },
 
       incrementMonthlyCount: () => {
-        set((state) => {
+        set((state: any) => {
           state.monthlyCount += 1;
         });
       },

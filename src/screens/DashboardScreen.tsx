@@ -3,7 +3,7 @@
  * Enhanced Dashboard with 3D Memory Crystal and AI Insights
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -30,28 +30,28 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 // Components
-import { MemoryCrystal } from '../../components/3D/MemoryCrystal';
-import { GlassCard } from '../../components/GlassCard';
-import { ProactiveInsightCard } from '../../components/ProactiveInsightCard';
-import { StreakCounter } from '../../components/StreakCounter';
-import { QuickActionButton } from '../../components/QuickActionButton';
-import { MemoryPreviewCard } from '../../components/MemoryPreviewCard';
-import { HolographicBackground } from '../../components/HolographicBackground';
-import { LoadingShimmer } from '../../components/LoadingShimmer';
+import MemoryCrystal from '../components/3D/MemoryCrystal';
+import { GlassCard } from '../components/GlassCard';
+import { ProactiveInsightCard } from '../components/ProactiveInsightCard';
+import { StreakCounter } from '../components/StreakCounter';
+import { QuickActionButton } from '../components/QuickActionButton';
+import { MemoryPreviewCard } from '../components/MemoryPreviewCard';
+import { HolographicBackground } from '../components/HolographicBackground';
+import { LoadingShimmer } from '../components/LoadingShimmer';
 
 // Store
-import { useMemoryStore } from '../../store/memoryStore';
-import { useAuthStore } from '../../store/authStore';
-import { useSubscriptionStore } from '../../store/subscriptionStore';
+import { useMemoryStore } from '../store/memoryStore';
+import { useAuthStore } from '../store/authStore';
+import { useSubscriptionStore } from '../store/subscriptionStore';
 
 // Services
-import { analyticsService } from '../../services/analytics';
-import { aiOrchestrator } from '../../services/ai/AIProvider';
+import { analyticsService } from '../services/analytics';
+import { aiOrchestrator } from '../services/ai/AIProvider';
 
 // Theme
-import theme from '../../theme/enhancedTheme';
+import theme from '../theme/enhancedTheme';
 
-const { colors, spacing, typography, borderRadius, shadows } = theme;
+const { colors, spacing, typography } = theme;
 
 // ============================================================================
 // TYPES
@@ -104,7 +104,7 @@ export const DashboardScreen: React.FC = () => {
   // Animations
   const crystalRotation = useSharedValue(0);
   const floatAnimation = useSharedValue(0);
-  const headerOpacity = useSharedValue(1);
+  // const headerOpacity = useSharedValue(1);
 
   // ========================================================================
   // EFFECTS
@@ -169,23 +169,23 @@ export const DashboardScreen: React.FC = () => {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const todayMemories = memories.filter(
-      m => new Date(m.createdAt) >= todayStart
+     const todayMemories = memories.filter(
+      (m: any) => new Date(m.createdAt) >= todayStart
     ).length;
-
+ 
     const weekMemories = memories.filter(
-      m => new Date(m.createdAt) >= weekStart
+      (m: any) => new Date(m.createdAt) >= weekStart
     ).length;
-
+ 
     // Calculate streak
     const streak = calculateStreak(memories);
-
+ 
     // Calculate recall rate (simplified)
     const recallRate = memories.length > 0 ? 85 : 0;
-
+ 
     // Category distribution
     const categories: Record<string, number> = {};
-    memories.forEach(m => {
+    memories.forEach((m: any) => {
       if (m.category) {
         categories[m.category] = (categories[m.category] || 0) + 1;
       }
@@ -247,12 +247,12 @@ export const DashboardScreen: React.FC = () => {
 
       if (insight) {
         const newInsight: ProactiveInsight = {
-          id: crypto.randomUUID(),
-          type: 'suggestion',
-          title: 'AI Insight',
-          description: insight,
+          id: insight.id || crypto.randomUUID(),
+          type: (insight.type === 'summary' ? 'suggestion' : insight.type) as any,
+          title: insight.title || 'AI Insight',
+          description: insight.description,
           priority: 1,
-          createdAt: new Date(),
+          createdAt: insight.createdAt || new Date(),
         };
 
         setProactiveInsights([newInsight]);
@@ -277,26 +277,26 @@ export const DashboardScreen: React.FC = () => {
 
   const handleCrystalPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    navigation.navigate('Memories' as never);
+    (navigation as any).navigate('Memories');
   };
 
   const handleQuickCapture = (type: 'voice' | 'text' | 'image') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    navigation.navigate('Capture' as never, { mode: type } as never);
+    (navigation as any).navigate('Capture', { mode: type });
     
     analyticsService.trackEvent('quick_capture_pressed', { type });
   };
 
   const handleMemoryPress = (memoryId: string) => {
     Haptics.selectionAsync();
-    navigation.navigate('MemoryDetail' as never, { memoryId } as never);
+    (navigation as any).navigate('MemoryDetail', { memoryId });
   };
 
   const handleInsightAction = (insight: ProactiveInsight) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
     if (insight.memoryId) {
-      navigation.navigate('MemoryDetail' as never, { memoryId: insight.memoryId } as never);
+      (navigation as any).navigate('MemoryDetail', { memoryId: insight.memoryId });
     }
     
     analyticsService.trackEvent('insight_actioned', {
@@ -315,9 +315,9 @@ export const DashboardScreen: React.FC = () => {
     ],
   }));
 
-  const headerStyle = useAnimatedStyle(() => ({
-    opacity: headerOpacity.value,
-  }));
+  // const headerStyle = useAnimatedStyle(() => ({
+  //   opacity: headerOpacity.value,
+  // }));
 
   // ========================================================================
   // RENDER HELPERS
@@ -456,7 +456,7 @@ export const DashboardScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {recentMemories.map((memory, index) => (
+        {recentMemories.map((memory: any, index: number) => (
           <Animated.View
             key={memory.id}
             entering={FadeInDown.delay(500 + index * 100)}
