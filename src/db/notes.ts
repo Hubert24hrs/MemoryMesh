@@ -6,6 +6,8 @@ import { db } from './database';
 import type { ActionItem, Mood, Note, NoteKind } from './types';
 
 export interface NewNote {
+  /** Deterministic id (e.g. daily notes, so devices converge on one note per day). */
+  id?: string;
   body: string;
   kind?: NoteKind;
   title?: string;
@@ -13,12 +15,14 @@ export interface NewNote {
   attachments?: string[];
   aiEnabled: boolean;
   dailyDate?: string | null;
+  /** False to defer AI (e.g. voice notes wait for the Whisper transcript). */
+  processAi?: boolean;
 }
 
 export async function createNote(input: NewNote): Promise<Note> {
   const now = Date.now();
   const note: Note = {
-    id: Crypto.randomUUID(),
+    id: input.id ?? Crypto.randomUUID(),
     title: input.title?.trim() ?? '',
     title_by_user: input.title?.trim() ? 1 : 0,
     body: input.body,
@@ -61,7 +65,7 @@ export async function createNote(input: NewNote): Promise<Note> {
     note.dirty,
   );
   notifyDataChanged();
-  if (note.ai_enabled && note.body.trim()) await enqueueJob(JOB.aiProcess, note.id);
+  if (note.ai_enabled && note.body.trim() && input.processAi !== false) await enqueueJob(JOB.aiProcess, note.id);
   await requestSync();
   return note;
 }
@@ -73,9 +77,18 @@ export interface NotePatch {
   actionItems?: ActionItem[];
 }
 
-export async function updateNote(id: string, patch: NotePatch): Promise<void> {
+/**
+ * `processAi: false` saves without queueing AI (the editor autosaves while
+ * typing and calls `queueAiProcessing` once when the user leaves the note).
+ */
+export async function updateNote(id: string, patch: NotePatch, options: { processAi?: boolean } = {}): Promise<void> {
+  const processAi = options.processAi ?? true;
   const current = await getNote(id);
   if (!current) return;
+  // An empty title from the editor means "keep the AI title", unless the user had set their own.
+  if (patch.title !== undefined && !patch.title.trim() && !current.title_by_user) {
+    patch = { ...patch, title: undefined };
+  }
   const sets: string[] = [];
   const params: (string | number | null)[] = [];
   const contentChanged =
@@ -98,7 +111,7 @@ export async function updateNote(id: string, patch: NotePatch): Promise<void> {
   if (patch.aiEnabled !== undefined && patch.aiEnabled !== !!current.ai_enabled) {
     sets.push('ai_enabled = ?', 'ai_status = ?');
     params.push(aiEnabled ? 1 : 0, aiEnabled ? 'pending' : 'off');
-  } else if (contentChanged && aiEnabled) {
+  } else if (contentChanged && aiEnabled && processAi) {
     sets.push('ai_status = ?');
     params.push('pending');
   }
@@ -110,8 +123,15 @@ export async function updateNote(id: string, patch: NotePatch): Promise<void> {
   notifyDataChanged();
 
   if (patch.aiEnabled === false && current.ai_enabled) await enqueueJob(JOB.aiForget, id);
-  else if (aiEnabled && (contentChanged || patch.aiEnabled === true)) await enqueueJob(JOB.aiProcess, id);
+  else if (aiEnabled && ((contentChanged && processAi) || patch.aiEnabled === true)) await enqueueJob(JOB.aiProcess, id);
   await requestSync();
+}
+
+export async function queueAiProcessing(id: string): Promise<void> {
+  const note = await getNote(id);
+  if (!note || note.deleted_at || !note.ai_enabled || !note.body.trim()) return;
+  await setAiStatus(id, 'pending');
+  await enqueueJob(JOB.aiProcess, id);
 }
 
 export async function deleteNote(id: string): Promise<void> {
