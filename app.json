@@ -173,27 +173,6 @@
       },
       "eas": {
         "projectId": "your-project-id-here"
-      },
-      "apiKeys": {
-        "supabase": {
-          "url": "https://your-project.supabase.co",
-          "anonKey": "your-anon-key"
-        },
-        "anthropic": {
-          "apiKey": "your-claude-api-key"
-        },
-        "kimi": {
-          "apiKey": "your-kimi-api-key",
-          "baseURL": "https://api.moonshot.cn/v1"
-        },
-        "openai": {
-          "apiKey": "your-openai-key"
-        },
-        "pinecone": {
-          "apiKey": "your-pinecone-key",
-          "environment": "us-east-1-aws",
-          "indexName": "memorymesh-memories"
-        }
       }
     },
     "owner": "your-expo-username",
