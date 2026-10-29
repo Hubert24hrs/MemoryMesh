@@ -1,0 +1,5 @@
+# Minimal Supabase CLI config. Run `supabase link --project-ref <ref>` before deploying.
+project_id = "memorymesh"
+
+[functions.revenuecat-webhook]
+verify_jwt = false
