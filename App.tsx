@@ -1,280 +1,107 @@
-// App.tsx
-/**
- * MemoryMesh Enhanced - Main App Entry Point
- * World-class AI memory assistant with multi-provider intelligence
- */
+import './src/i18n';
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { StatusBar, LogBox, Platform } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  useFonts,
+} from '@expo-google-fonts/inter';
+import { DarkTheme, DefaultTheme, NavigationContainer, type Theme as NavTheme } from '@react-navigation/native';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { addNetworkStateListener } from 'expo-network';
+import { ShareIntentProvider } from 'expo-share-intent';
 import * as SplashScreen from 'expo-splash-screen';
-import * as Font from 'expo-font';
-import * as Notifications from 'expo-notifications';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
-import * as Sentry from '@sentry/react-native';
-import mobileAds from 'react-native-google-mobile-ads';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useMemo, useState } from 'react';
+import { AppState } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-// Navigation
+import { LockGate } from './src/components/LockGate';
+import { ShareHandler } from './src/components/ShareHandler';
+import { initDatabase } from './src/db/database';
+import { queryClient } from './src/lib/useDb';
+import { navigationRef } from './src/navigation/ref';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { onSignedIn } from './src/services/account';
+import { kickWorker } from './src/services/jobs';
+import { startBackgroundWork } from './src/services/organizer';
+import { initPurchases } from './src/services/purchases';
+import { initSession } from './src/store/session';
+import { font, useTheme } from './src/theme/theme';
 
-// Store
-import { useAuthStore } from './src/store/authStore';
-import { useThemeStore } from './src/store/themeStore';
-import { useSubscriptionStore } from './src/store/subscriptionStore';
+void SplashScreen.preventAutoHideAsync();
 
-// Services
-import { aiOrchestrator } from './src/services/ai/AIProvider';
-import { encryptionService } from './src/services/encryption';
-import { notificationService } from './src/services/notifications';
-import { offlineSync } from './src/services/offlineSync';
-import { analyticsService } from './src/services/analytics';
-
-// Components
-import { LoadingScreen } from './src/components/LoadingScreen';
-import { ErrorBoundary } from './src/components/ErrorBoundary';
-
-// Theme
-// import theme from './src/theme/enhancedTheme';
-
-// Ignore specific warnings
-LogBox.ignoreLogs([
-  'Non-serializable values were found in the navigation state',
-  'Require cycle:',
-]);
-
-// Prevent splash screen from auto-hiding
-SplashScreen.preventAutoHideAsync();
-
-// Configure Sentry for error tracking
-if (!__DEV__) {
-  Sentry.init({
-    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-    environment: process.env.APP_ENV || 'production',
-    tracesSampleRate: 1.0,
-    enableAutoSessionTracking: true,
-    sessionTrackingIntervalMillis: 10000,
-    enableNative: true,
-    enableNativeCrashHandling: true,
-    attachStacktrace: true,
-    maxBreadcrumbs: 50,
-  });
-}
-
-// Configure notifications
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  } as any),
-});
-
-// React Query client configuration
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 30, // 30 minutes (formerly cacheTime)
-      retry: 2,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: true,
-      networkMode: 'offlineFirst',
-    },
-    mutations: {
-      retry: 1,
-      networkMode: 'offlineFirst',
-    },
-  },
-});
-
-// ============================================================================
-// MAIN APP COMPONENT
-// ============================================================================
-
-function AppContent() {
-  const [appReady, setAppReady] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  
-  const initializeAuth = useAuthStore(state => state.initialize);
-  const initializeTheme = useThemeStore(state => state.initialize);
-  const initializeSubscription = useSubscriptionStore(state => state.initialize);
-
-  /**
-   * Initialize all app services
-   */
-  const initializeApp = useCallback(async () => {
-    try {
-      console.log('🚀 Initializing MemoryMesh Enhanced...');
-
-      // 1. Load custom fonts
-      await Font.loadAsync({
-        'Inter-Regular': require('./assets/fonts/Inter-Regular.ttf'),
-        'Inter-Medium': require('./assets/fonts/Inter-Medium.ttf'),
-        'Inter-SemiBold': require('./assets/fonts/Inter-SemiBold.ttf'),
-        'Inter-Bold': require('./assets/fonts/Inter-Bold.ttf'),
-        'SpaceGrotesk-Bold': require('./assets/fonts/SpaceGrotesk-Bold.ttf'),
-      });
-      console.log('✅ Fonts loaded');
-
-      // 2. Initialize encryption service
-      await encryptionService.initialize();
-      console.log('✅ Encryption initialized');
-
-      // 3. Initialize authentication
-      await initializeAuth();
-      console.log('✅ Authentication initialized');
-
-      // 4. Initialize theme
-      await initializeTheme();
-      console.log('✅ Theme initialized');
-
-      // 5. Initialize subscription management
-      await initializeSubscription();
-      console.log('✅ Subscriptions initialized');
-
-      // 6. Initialize notifications
-      await notificationService.initialize();
-      console.log('✅ Notifications initialized');
-
-      // 7. Initialize offline sync
-      await offlineSync.setupRealtimeSync();
-      console.log('✅ Offline sync initialized');
-
-      // 8. Initialize AdMob (only for free users)
-      await mobileAds().initialize();
-      console.log('✅ AdMob initialized');
-
-      // 9. Initialize analytics
-      await analyticsService.initialize();
-      await analyticsService.trackEvent('app_opened', {
-        platform: Platform.OS,
-        version: '2.0.0',
-      });
-      console.log('✅ Analytics initialized');
-
-      // 10. Test AI providers connectivity
-      console.log('🧠 Testing AI providers...');
-      const capabilities = aiOrchestrator.getAllCapabilities();
-      console.log('✅ AI providers ready:', capabilities);
-
-      // All initialization complete
-      console.log('🎉 MemoryMesh Enhanced ready!');
-      setAppReady(true);
-      
-    } catch (e) {
-      console.error('❌ Initialization failed:', e);
-      setError(e as Error);
-      Sentry.captureException(e);
-    } finally {
-      // Hide splash screen after initialization
-      await SplashScreen.hideAsync();
-    }
-  }, [initializeAuth, initializeTheme, initializeSubscription]);
-
-  /**
-   * Run initialization on mount
-   */
-  useEffect(() => {
-    initializeApp();
-  }, [initializeApp]);
-
-  /**
-   * Setup notification listeners
-   */
-  useEffect(() => {
-    const handleNotificationReceived = (notification: Notifications.Notification) => {
-      console.log('📬 Notification received:', notification);
-      analyticsService.trackEvent('notification_received', {
-        type: notification.request.content.data?.type,
-      });
-    };
-
-    const handleNotificationResponse = (response: Notifications.NotificationResponse) => {
-      console.log('👆 Notification tapped:', response);
-      analyticsService.trackEvent('notification_tapped', {
-        type: response.notification.request.content.data?.type,
-      });
-      
-      // Navigate to relevant screen based on notification type
-      // const { type, memoryId } = response.notification.request.content.data || {};
-      // Navigation will be handled in RootNavigator
-    };
-
-    const cleanup = notificationService.setupNotificationListeners(
-      handleNotificationReceived,
-      handleNotificationResponse
-    );
-
-    return cleanup;
-  }, []);
-
-  /**
-   * Handle deep linking
-   */
-  const linking: any = {
-    prefixes: ['memorymesh://', 'https://memorymesh.app'],
-    config: {
-      screens: {
-        Auth: 'auth',
-        MainTabs: {
-          screens: {
-            Dashboard: 'dashboard',
-            Memories: 'memories',
-            Insights: 'insights',
-            Profile: 'profile',
-          },
-        },
-        MemoryDetail: 'memory/:memoryId',
-        Capture: 'capture',
-        Settings: 'settings',
-        Paywall: 'upgrade',
-      },
-    },
-  };
-
-  // Show loading screen while initializing
-  if (!appReady && !error) {
-    return <LoadingScreen />;
-  }
-
-  // Show error screen if initialization failed
-  if (error) {
-    return (
-      <ErrorBoundary error={error}>
-        <LoadingScreen />
-      </ErrorBoundary>
-    );
-  }
-
-  return (
-    <NavigationContainer linking={linking}>
-      <RootNavigator />
-      <StatusBar style="light" translucent backgroundColor="transparent" />
-    </NavigationContainer>
-  );
-}
-
-// ============================================================================
-// MAIN APP WITH PROVIDERS
-// ============================================================================
+const WORKER_INTERVAL_MS = 60_000;
 
 export default function App() {
+  const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold });
+  const [ready, setReady] = useState(false);
+  const { dark, c } = useTheme();
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        await initDatabase();
+        startBackgroundWork();
+        initPurchases();
+        await initSession((userId) => void onSignedIn(userId));
+      } finally {
+        setReady(true);
+        kickWorker(0);
+      }
+    })();
+
+    // Drain queued AI/sync jobs when connectivity returns, on foreground, and periodically.
+    const net = addNetworkStateListener((state) => {
+      if (state.isConnected) kickWorker(500);
+    });
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active') kickWorker(0);
+    });
+    const interval = setInterval(() => {
+      if (AppState.currentState === 'active') kickWorker(0);
+    }, WORKER_INTERVAL_MS);
+    return () => {
+      net.remove();
+      appState.remove();
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (fontsLoaded && ready) void SplashScreen.hideAsync();
+  }, [fontsLoaded, ready]);
+
+  const navTheme: NavTheme = useMemo(() => {
+    const base = dark ? DarkTheme : DefaultTheme;
+    return {
+      ...base,
+      colors: { ...base.colors, primary: c.accentText, background: c.bg, card: c.bg, text: c.text, border: c.border },
+      fonts: {
+        regular: { fontFamily: font.regular, fontWeight: '400' },
+        medium: { fontFamily: font.medium, fontWeight: '500' },
+        bold: { fontFamily: font.semibold, fontWeight: '600' },
+        heavy: { fontFamily: font.bold, fontWeight: '700' },
+      },
+    };
+  }, [dark, c]);
+
+  if (!fontsLoaded || !ready) return null;
+
   return (
-    <ErrorBoundary>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <QueryClientProvider client={queryClient}>
-            <BottomSheetModalProvider>
-              <AppContent />
-            </BottomSheetModalProvider>
-          </QueryClientProvider>
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
-    </ErrorBoundary>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <ShareIntentProvider>
+          <NavigationContainer ref={navigationRef} theme={navTheme}>
+            <LockGate>
+              <RootNavigator />
+            </LockGate>
+            <ShareHandler />
+          </NavigationContainer>
+          <StatusBar style={dark ? 'light' : 'dark'} />
+        </ShareIntentProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }

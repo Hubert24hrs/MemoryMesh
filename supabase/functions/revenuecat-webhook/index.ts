@@ -1,65 +1,74 @@
-// Deno Supabase Edge Function: revenuecat-webhook
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// RevenueCat → Supabase entitlement sync. The app logs in to RevenueCat with
+// the Supabase user id, so `app_user_id` is the profile id.
+// Deployed with verify_jwt = false; authenticated by a shared secret instead.
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { adminClient, json } from '../_shared/http.ts';
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const GRANTS = new Set([
+  'INITIAL_PURCHASE',
+  'RENEWAL',
+  'PRODUCT_CHANGE',
+  'UNCANCELLATION',
+  'NON_RENEWING_PURCHASE',
+  'SUBSCRIPTION_EXTENDED',
+  'TEMPORARY_ENTITLEMENT_GRANT',
+  // Cancellation/billing issues keep access until the expiration date.
+  'CANCELLATION',
+  'BILLING_ISSUE',
+]);
+
+interface RevenueCatEvent {
+  type: string;
+  app_user_id?: string;
+  original_app_user_id?: string;
+  aliases?: string[];
+  product_id?: string;
+  expiration_at_ms?: number | null;
+}
+
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+Deno.serve(async (req) => {
+  const secret = Deno.env.get('REVENUECAT_WEBHOOK_SECRET');
+  const auth = req.headers.get('Authorization') ?? '';
+  if (!secret || !safeEqual(auth, `Bearer ${secret}`)) return json({ error: 'unauthorized' }, 401);
+  if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
+
+  const { event } = (await req.json()) as { event?: RevenueCatEvent };
+  if (!event) return json({ error: 'missing event' }, 400);
+
+  const userId = [event.app_user_id, event.original_app_user_id, ...(event.aliases ?? [])].find(
+    (id): id is string => !!id && UUID.test(id),
+  );
+  if (!userId) return json({ ignored: 'no supabase user id' });
+
+  const lifetime = /lifetime/i.test(event.product_id ?? '') || event.type === 'NON_RENEWING_PURCHASE';
+  let update: Record<string, unknown> | null = null;
+  if (event.type === 'EXPIRATION') {
+    update = lifetime ? null : { plan: 'free', plan_source: null, plan_expires_at: null };
+  } else if (GRANTS.has(event.type)) {
+    update = {
+      plan: 'pro',
+      plan_source: lifetime ? 'lifetime' : 'monthly',
+      plan_expires_at: lifetime || !event.expiration_at_ms ? null : new Date(event.expiration_at_ms).toISOString(),
+    };
   }
+  if (!update) return json({ ignored: event.type });
 
-  try {
-    const body = await req.json();
-    const event = body.event;
-
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
-    const appUserId = event.app_user_id;
-    const entitlementId = event.entitlement_id;
-    const eventType = event.type;
-
-    console.log(`💳 [Edge revenuecat-webhook] Billing webhook: ${eventType} for ${appUserId}`);
-
-    let activePro = false;
-    if (eventType === "INITIAL_PURCHASE" || eventType === "RENEWAL") {
-      activePro = true;
-    } else if (eventType === "CANCELLATION" || eventType === "EXPIRATION") {
-      activePro = false;
-    } else {
-      return new Response(JSON.stringify({ success: true, message: "Ignored event type." }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
-
-    // Toggle active Pro plans status in remote profiles database
-    const { error } = await supabaseClient
-      .from("users")
-      .update({
-        is_pro: activePro,
-        plan_tier: activePro ? "pro" : "free",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", appUserId);
-
-    if (error) throw error;
-
-    return new Response(JSON.stringify({ success: true, message: "Entitlement synchronized." }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
-  } catch (err: any) {
-    console.error("RevenueCat webhook failed:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
-    });
+  const { error } = await adminClient()
+    .from('profiles')
+    .update({ ...update, updated_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) {
+    console.error(error);
+    return json({ error: 'update failed' }, 500);
   }
+  return json({ ok: true });
 });
